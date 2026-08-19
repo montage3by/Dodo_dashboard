@@ -751,12 +751,45 @@
     e.target.value = '';
   });
 
-  ['filterPlatform','filterType','filterCampaign','dateFrom','dateTo'].forEach((id) => {
+  const DATE_FILTER_KEY = 'dodoDashboardDateFilters';
+
+  function saveDateFilters() {
+    try {
+      localStorage.setItem(DATE_FILTER_KEY, JSON.stringify({
+        from: el('dateFrom').value,
+        to: el('dateTo').value,
+      }));
+    } catch (err) {
+      // localStorage unavailable — ignore
+    }
+  }
+
+  function loadDateFilters() {
+    try {
+      const raw = localStorage.getItem(DATE_FILTER_KEY);
+      if (!raw) return;
+      const { from, to } = JSON.parse(raw);
+      if (from) el('dateFrom').value = from;
+      if (to) el('dateTo').value = to;
+    } catch (err) {
+      // corrupt or unavailable — ignore
+    }
+  }
+
+  ['filterPlatform','filterType','filterCampaign'].forEach((id) => {
     el(id).addEventListener('change', renderAll);
+  });
+
+  ['dateFrom','dateTo'].forEach((id) => {
+    el(id).addEventListener('change', () => {
+      saveDateFilters();
+      renderAll();
+    });
   });
 
   // ---------- Init ----------
   (async function init() {
+    loadDateFilters();
     try {
       allRows = await fetchRows();
     } catch (err) {
