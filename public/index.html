@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dodo Marketing Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e8eaed;
+    --muted: #9aa2b1;
+    --accent: #ff6b35;
+    --accent-2: #4da3ff;
+    --good: #35c37b;
+    --bad: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 14px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  main { padding: 24px 28px 60px; max-width: 1400px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .toolbar label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .toolbar select, .toolbar input[type="date"] {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .toolbar .spacer { flex: 1; }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn.secondary {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn.danger { background: var(--bad); }
+  .btn:hover { filter: brightness(1.08); }
+  input[type="file"] { display: none; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .kpi .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .kpi .value { font-size: 22px; font-weight: 700; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card h3 { margin: 0 0 12px; font-size: 14px; color: var(--muted); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+  tbody tr:hover { background: var(--panel-2); }
+  .table-wrap { max-height: 480px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .placeholder {
+    background: var(--panel);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .placeholder h2 { color: var(--text); margin-top: 0; }
+  .status-msg { font-size: 12px; color: var(--muted); margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Dodo Marketing Dashboard</h1>
+    <div class="sub">Mindbox · Google Ads · Meta</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="mindbox">Mindbox</button>
+  <button class="tab-btn" data-tab="google">Google Ads</button>
+  <button class="tab-btn" data-tab="meta">Meta</button>
+</nav>
+
+<main>
+
+  <!-- MINDBOX TAB -->
+  <section id="tab-mindbox" class="tab-panel active">
+    <div class="toolbar">
+      <div>
+        <label for="csvInput">Загрузить CSV</label>
+        <button class="btn" id="uploadBtn">Загрузить CSV</button>
+        <input type="file" id="csvInput" accept=".csv">
+      </div>
+      <div>
+        <label for="filterPlatform">Платформа</label>
+        <select id="filterPlatform"><option value="">Все</option></select>
+      </div>
+      <div>
+        <label for="filterType">Тип</label>
+        <select id="filterType"><option value="">Все</option></select>
+      </div>
+      <div>
+        <label for="filterCampaign">Кампания</label>
+        <select id="filterCampaign"><option value="">Все</option></select>
+      </div>
+      <div>
+        <label for="dateFrom">С</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div>
+        <label for="dateTo">По</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div class="spacer"></div>
+      <span id="statusMsg" class="status-msg"></span>
+      <button class="btn danger" id="resetBtn">Сбросить</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Отправлено</div><div class="value" id="kpiSent">0</div></div>
+      <div class="kpi"><div class="label">Доставлено</div><div class="value" id="kpiDelivered">0</div></div>
+      <div class="kpi"><div class="label">% доставки</div><div class="value" id="kpiDeliveryRate">0%</div></div>
+      <div class="kpi"><div class="label">Клики</div><div class="value" id="kpiClicked">0</div></div>
+      <div class="kpi"><div class="label">% кликов</div><div class="value" id="kpiClickRate">0%</div></div>
+      <div class="kpi"><div class="label">Конверсии</div><div class="value" id="kpiConversions">0</div></div>
+      <div class="kpi"><div class="label">Доход</div><div class="value" id="kpiRevenue">0 ₽</div></div>
+      <div class="kpi"><div class="label">Средний чек</div><div class="value" id="kpiAvgOrder">0 ₽</div></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="card">
+        <h3>Доход по датам</h3>
+        <canvas id="revenueChart" height="110"></canvas>
+      </div>
+      <div class="card">
+        <h3>Воронка: отправлено → доставлено → клики → конверсии</h3>
+        <canvas id="funnelChart" height="110"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Рассылки</h3>
+      <div class="table-wrap">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>Дата</th><th>Название</th><th>Тема</th><th>Платформа</th><th>Тип</th><th>Кампания</th>
+              <th>Отправлено</th><th>Доставлено</th><th>% дост.</th>
+              <th>Клики</th><th>% кл.</th><th>Конверсии</th><th>% конв.</th>
+              <th>Доход</th><th>Ср. чек</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty-state" style="display:none;">Нет данных. Загрузите CSV-файл с рассылками Mindbox.</div>
+    </div>
+  </section>
+
+  <!-- GOOGLE ADS TAB -->
+  <section id="tab-google" class="tab-panel">
+    <div class="placeholder">
+      <h2>Google Ads</h2>
+      <p>Интеграция в разработке. Здесь появятся расходы, клики, конверсии и ROAS по кампаниям Google Ads.</p>
+    </div>
+  </section>
+
+  <!-- META TAB -->
+  <section id="tab-meta" class="tab-panel">
+    <div class="placeholder">
+      <h2>Meta Ads</h2>
+      <p>Интеграция в разработке. Здесь появятся расходы, охват, клики и конверсии по кампаниям Meta.</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  const FIELDS = ['mailingId','name','subject','platform','type','campaign','dateStr',
+    'sent','delivered','deliveryRate','clicked','clickRate','conversions','conversionRate','revenue','avgOrder'];
+
+  const HEADER_ALIASES = {
+    'idрассылки': 'mailingId', 'id': 'mailingId', 'mailingid': 'mailingId',
+    'название': 'name', 'name': 'name',
+    'темаписьма': 'subject', 'тема': 'subject', 'subject': 'subject',
+    'платформа': 'platform', 'platform': 'platform',
+    'тип': 'type', 'type': 'type',
+    'кампания': 'campaign', 'campaign': 'campaign',
+    'дата': 'dateStr', 'date': 'dateStr',
+    'отправлено': 'sent', 'sent': 'sent',
+    'доставлено': 'delivered', 'delivered': 'delivered',
+    '%доставки': 'deliveryRate', 'доставка%': 'deliveryRate', 'deliveryrate': 'deliveryRate',
+    'клики': 'clicked', 'clicked': 'clicked', 'clicks': 'clicked',
+    '%кликов': 'clickRate', 'клики%': 'clickRate', 'clickrate': 'clickRate',
+    'конверсии': 'conversions', 'conversions': 'conversions',
+    '%конверсии': 'conversionRate', 'конверсия%': 'conversionRate', 'conversionrate': 'conversionRate',
+    'доход': 'revenue', 'revenue': 'revenue',
+    'среднийчек': 'avgOrder', 'avgorder': 'avgOrder', 'aov': 'avgOrder',
+  };
+
+  let allRows = [];
+  let revenueChart, funnelChart;
+
+  const el = (id) => document.getElementById(id);
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+      btn.classList.add('active');
+      el('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- CSV parsing ----------
+  function detectDelimiter(headerLine) {
+    const commas = (headerLine.match(/,/g) || []).length;
+    const semis = (headerLine.match(/;/g) || []).length;
+    return semis > commas ? ';' : ',';
+  }
+
+  function parseCSVLine(line, delim) {
+    const result = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += c;
+      } else {
+        if (c === '"') inQuotes = true;
+        else if (c === delim) { result.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    result.push(cur);
+    return result.map((s) => s.trim());
+  }
+
+  function normalizeHeader(h) {
+    return h.replace(/^﻿/, '').trim().toLowerCase().replace(/\s+/g, '').replace(/["']/g, '');
+  }
+
+  function parseNumber(v) {
+    if (v == null || v === '') return 0;
+    const cleaned = String(v).replace(/\s/g, '').replace('%', '').replace(',', '.');
+    const n = parseFloat(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function parseCSV(text) {
+    const lines = text.split(/\r\n|\n|\r/).filter((l) => l.length > 0);
+    if (lines.length === 0) return [];
+    const delim = detectDelimiter(lines[0]);
+    const rawHeaders = parseCSVLine(lines[0], delim);
+    const fieldMap = rawHeaders.map((h) => HEADER_ALIASES[normalizeHeader(h)] || null);
+
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseCSVLine(lines[i], delim);
+      const row = {};
+      fieldMap.forEach((field, idx) => {
+        if (!field) return;
+        row[field] = cells[idx];
+      });
+      if (!row.mailingId) row.mailingId = `${row.campaign || ''}_${row.dateStr || ''}_${i}`;
+      for (const numField of ['sent','delivered','deliveryRate','clicked','clickRate','conversions','conversionRate','revenue','avgOrder']) {
+        row[numField] = parseNumber(row[numField]);
+      }
+      for (const strField of ['name','subject','platform','type','campaign','dateStr']) {
+        row[strField] = row[strField] || '';
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  // ---------- API ----------
+  async function fetchRows() {
+    const res = await fetch('/api/mindbox');
+    const data = await res.json();
+    return data.rows || [];
+  }
+
+  async function pushRows(rows) {
+    const res = await fetch('/api/mindbox', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+    const data = await res.json();
+    return data.rows || [];
+  }
+
+  async function resetRows() {
+    await fetch('/api/mindbox', { method: 'DELETE' });
+  }
+
+  // ---------- Rendering ----------
+  function setStatus(msg) {
+    el('statusMsg').textContent = msg;
+    if (msg) setTimeout(() => { el('statusMsg').textContent = ''; }, 4000);
+  }
+
+  function fmtInt(n) { return Math.round(n).toLocaleString('ru-RU'); }
+  function fmtMoney(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
+  function fmtPct(n) { return n.toFixed(1) + '%'; }
+
+  function populateFilterOptions() {
+    const platforms = [...new Set(allRows.map((r) => r.platform).filter(Boolean))].sort();
+    const types = [...new Set(allRows.map((r) => r.type).filter(Boolean))].sort();
+    const campaigns = [...new Set(allRows.map((r) => r.campaign).filter(Boolean))].sort();
+
+    fillSelect('filterPlatform', platforms);
+    fillSelect('filterType', types);
+    fillSelect('filterCampaign', campaigns);
+  }
+
+  function fillSelect(id, values) {
+    const select = el(id);
+    const current = select.value;
+    select.innerHTML = '<option value="">Все</option>' + values.map((v) => `<option value="${v}">${v}</option>`).join('');
+    if (values.includes(current)) select.value = current;
+  }
+
+  function getFilteredRows() {
+    const platform = el('filterPlatform').value;
+    const type = el('filterType').value;
+    const campaign = el('filterCampaign').value;
+    const dateFrom = el('dateFrom').value;
+    const dateTo = el('dateTo').value;
+
+    return allRows.filter((r) => {
+      if (platform && r.platform !== platform) return false;
+      if (type && r.type !== type) return false;
+      if (campaign && r.campaign !== campaign) return false;
+      if (dateFrom && r.dateStr && r.dateStr < dateFrom) return false;
+      if (dateTo && r.dateStr && r.dateStr > dateTo) return false;
+      return true;
+    });
+  }
+
+  function renderAll() {
+    populateFilterOptions();
+    const rows = getFilteredRows();
+    renderKPIs(rows);
+    renderTable(rows);
+    renderCharts(rows);
+  }
+
+  function renderKPIs(rows) {
+    const sent = rows.reduce((s, r) => s + r.sent, 0);
+    const delivered = rows.reduce((s, r) => s + r.delivered, 0);
+    const clicked = rows.reduce((s, r) => s + r.clicked, 0);
+    const conversions = rows.reduce((s, r) => s + r.conversions, 0);
+    const revenue = rows.reduce((s, r) => s + r.revenue, 0);
+
+    el('kpiSent').textContent = fmtInt(sent);
+    el('kpiDelivered').textContent = fmtInt(delivered);
+    el('kpiDeliveryRate').textContent = sent ? fmtPct((delivered / sent) * 100) : '0%';
+    el('kpiClicked').textContent = fmtInt(clicked);
+    el('kpiClickRate').textContent = delivered ? fmtPct((clicked / delivered) * 100) : '0%';
+    el('kpiConversions').textContent = fmtInt(conversions);
+    el('kpiRevenue').textContent = fmtMoney(revenue);
+    el('kpiAvgOrder').textContent = conversions ? fmtMoney(revenue / conversions) : '0 ₽';
+  }
+
+  function renderTable(rows) {
+    const tbody = el('tableBody');
+    const sorted = [...rows].sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+    tbody.innerHTML = sorted.map((r) => `
+      <tr>
+        <td>${r.dateStr || ''}</td>
+        <td>${r.name || ''}</td>
+        <td>${r.subject || ''}</td>
+        <td>${r.platform || ''}</td>
+        <td>${r.type || ''}</td>
+        <td>${r.campaign || ''}</td>
+        <td>${fmtInt(r.sent)}</td>
+        <td>${fmtInt(r.delivered)}</td>
+        <td>${fmtPct(r.deliveryRate)}</td>
+        <td>${fmtInt(r.clicked)}</td>
+        <td>${fmtPct(r.clickRate)}</td>
+        <td>${fmtInt(r.conversions)}</td>
+        <td>${fmtPct(r.conversionRate)}</td>
+        <td>${fmtMoney(r.revenue)}</td>
+        <td>${fmtMoney(r.avgOrder)}</td>
+      </tr>
+    `).join('');
+    el('emptyState').style.display = rows.length ? 'none' : 'block';
+    el('dataTable').style.display = rows.length ? '' : 'none';
+  }
+
+  function renderCharts(rows) {
+    const byDate = {};
+    rows.forEach((r) => {
+      if (!r.dateStr) return;
+      byDate[r.dateStr] = (byDate[r.dateStr] || 0) + r.revenue;
+    });
+    const dates = Object.keys(byDate).sort();
+    const revenueData = dates.map((d) => byDate[d]);
+
+    const ctxRevenue = el('revenueChart').getContext('2d');
+    if (revenueChart) revenueChart.destroy();
+    revenueChart = new Chart(ctxRevenue, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Доход',
+          data: revenueData,
+          borderColor: '#ff6b35',
+          backgroundColor: 'rgba(255,107,53,0.15)',
+          fill: true,
+          tension: 0.25,
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+          y: { ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+        },
+      },
+    });
+
+    const sent = rows.reduce((s, r) => s + r.sent, 0);
+    const delivered = rows.reduce((s, r) => s + r.delivered, 0);
+    const clicked = rows.reduce((s, r) => s + r.clicked, 0);
+    const conversions = rows.reduce((s, r) => s + r.conversions, 0);
+
+    const ctxFunnel = el('funnelChart').getContext('2d');
+    if (funnelChart) funnelChart.destroy();
+    funnelChart = new Chart(ctxFunnel, {
+      type: 'bar',
+      data: {
+        labels: ['Отправлено', 'Доставлено', 'Клики', 'Конверсии'],
+        datasets: [{
+          data: [sent, delivered, clicked, conversions],
+          backgroundColor: ['#4da3ff', '#35c37b', '#ff6b35', '#ffcc33'],
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9aa2b1' }, grid: { display: false } },
+          y: { ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+        },
+      },
+    });
+  }
+
+  // ---------- Events ----------
+  el('uploadBtn').addEventListener('click', () => el('csvInput').click());
+
+  el('csvInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsedRows = parseCSV(text);
+    if (parsedRows.length === 0) {
+      setStatus('Файл пустой или не распознан');
+      return;
+    }
+    setStatus(`Загрузка ${parsedRows.length} строк...`);
+    allRows = await pushRows(parsedRows);
+    renderAll();
+    setStatus(`Готово: ${parsedRows.length} строк обработано`);
+    e.target.value = '';
+  });
+
+  el('resetBtn').addEventListener('click', async () => {
+    if (!confirm('Удалить все загруженные данные Mindbox?')) return;
+    await resetRows();
+    allRows = [];
+    renderAll();
+    setStatus('Данные сброшены');
+  });
+
+  ['filterPlatform','filterType','filterCampaign','dateFrom','dateTo'].forEach((id) => {
+    el(id).addEventListener('change', renderAll);
+  });
+
+  // ---------- Init ----------
+  (async function init() {
+    try {
+      allRows = await fetchRows();
+    } catch (err) {
+      console.error(err);
+      setStatus('Ошибка загрузки данных с сервера');
+    }
+    renderAll();
+  })();
+})();
+</script>
+
+</body>
+</html>
