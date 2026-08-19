@@ -156,6 +156,8 @@
   }
   .placeholder h2 { color: var(--text); margin-top: 0; }
   .status-msg { font-size: 12px; color: var(--muted); margin-left: 8px; }
+  .format-hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: -8px 0 20px; }
+  .format-hint code { color: var(--text); }
 
   .insights-section { margin-bottom: 20px; }
   .panel { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
@@ -209,13 +211,14 @@
     <img src="/dodo-logo.png" alt="Dodo Pizza" onerror="this.style.display='none'">
     <div>
       <h1>Dodo Marketing Dashboard</h1>
-      <div class="sub">Mindbox · Google Ads · Meta</div>
+      <div class="sub">Mindbox · Dodo Маркетинг · Google Ads · Meta</div>
     </div>
   </div>
 </header>
 
 <nav class="tabs">
   <button class="tab-btn active" data-tab="mindbox">Mindbox</button>
+  <button class="tab-btn" data-tab="marketing">Dodo Маркетинг</button>
   <button class="tab-btn" data-tab="google">Google Ads</button>
   <button class="tab-btn" data-tab="meta">Meta</button>
 </nav>
@@ -350,6 +353,82 @@
     </div>
   </section>
 
+  <!-- DODO MARKETING TAB -->
+  <section id="tab-marketing" class="tab-panel">
+    <div class="toolbar">
+      <div>
+        <label for="marketingCsvInput">Загрузить CSV</label>
+        <button class="btn" id="marketingUploadBtn">Загрузить CSV</button>
+        <input type="file" id="marketingCsvInput" accept=".csv">
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button class="btn secondary" id="marketingTemplateBtn">Скачать шаблон</button>
+      </div>
+      <div>
+        <label for="marketingUnit">Пиццерия</label>
+        <select id="marketingUnit"><option value="">Все</option></select>
+      </div>
+      <div>
+        <label for="marketingPromo">Промокод</label>
+        <select id="marketingPromo"><option value="">Все</option></select>
+      </div>
+      <div>
+        <label for="marketingDateFrom">С</label>
+        <input type="date" id="marketingDateFrom">
+      </div>
+      <div>
+        <label for="marketingDateTo">По</label>
+        <input type="date" id="marketingDateTo">
+      </div>
+      <div class="spacer"></div>
+      <span id="marketingStatus" class="status-msg"></span>
+    </div>
+
+    <div class="format-hint">
+      Одна строка — один день, пиццерия и промокод. Поддерживаемые поля:
+      <code>Дата, Пиццерия, Новые клиенты, Промокод, Срабатывания, Уникальные клиенты, Новые клиенты по промокоду, Заказы, Выручка, Скидка</code>.
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Новые клиенты</div><div class="value" id="marketingNewClients">0</div></div>
+      <div class="kpi"><div class="label">Срабатывания промокодов</div><div class="value" id="marketingPromoUses">0</div></div>
+      <div class="kpi"><div class="label">Уникальные клиенты</div><div class="value" id="marketingPromoCustomers">0</div></div>
+      <div class="kpi"><div class="label">Новые по промокоду</div><div class="value" id="marketingPromoNewClients">0</div></div>
+      <div class="kpi"><div class="label">Доля новых</div><div class="value" id="marketingNewShare">0%</div></div>
+      <div class="kpi"><div class="label">Выручка по промокодам</div><div class="value" id="marketingRevenue">0 ₾</div></div>
+      <div class="kpi"><div class="label">Сумма скидок</div><div class="value" id="marketingDiscount">0 ₾</div></div>
+      <div class="kpi"><div class="label">Средний чек</div><div class="value" id="marketingAvgOrder">0 ₾</div></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="card">
+        <h3>Новые клиенты по датам</h3>
+        <canvas id="marketingClientsChart" height="110"></canvas>
+      </div>
+      <div class="card">
+        <h3>Срабатывания промокодов по датам</h3>
+        <canvas id="marketingPromoChart" height="110"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Эффективность промокодов</h3>
+      <div class="table-wrap">
+        <table id="promoTable">
+          <thead>
+            <tr>
+              <th>Промокод</th><th>Срабатывания</th><th>Уник. клиенты</th><th>Новые</th><th>Доля новых</th>
+              <th>Заказы</th><th>Выручка</th><th>Скидка</th><th>Ср. чек</th><th>Выручка / скидка</th>
+            </tr>
+          </thead>
+          <tbody id="promoTableBody"></tbody>
+        </table>
+      </div>
+      <div id="marketingEmptyState" class="empty-state" style="display:none;">Нет данных. Загрузите CSV из отчётов Dodo IS.</div>
+    </div>
+  </section>
+
   <!-- GOOGLE ADS TAB -->
   <section id="tab-google" class="tab-panel">
     <div class="placeholder">
@@ -394,8 +473,23 @@
     'среднийчек': 'avgOrder', 'avgorder': 'avgOrder', 'aov': 'avgOrder',
   };
 
+  const MARKETING_HEADER_ALIASES = {
+    'дата': 'dateStr', 'date': 'dateStr', 'datestr': 'dateStr',
+    'пиццерия': 'unit', 'заведение': 'unit', 'ресторан': 'unit', 'unit': 'unit', 'restaurant': 'unit',
+    'новыеклиенты': 'newClients', 'newclients': 'newClients',
+    'промокод': 'promoCode', 'promo': 'promoCode', 'promocode': 'promoCode',
+    'срабатывания': 'promoUses', 'применения': 'promoUses', 'использования': 'promoUses', 'promouses': 'promoUses', 'uses': 'promoUses',
+    'уникальныеклиенты': 'promoCustomers', 'клиентыспромокодом': 'promoCustomers', 'promocustomers': 'promoCustomers', 'uniquecustomers': 'promoCustomers',
+    'новыеклиентыпопромокоду': 'promoNewClients', 'новыепопромокоду': 'promoNewClients', 'promonewclients': 'promoNewClients',
+    'заказы': 'orders', 'orders': 'orders',
+    'выручка': 'revenue', 'revenue': 'revenue',
+    'скидка': 'discount', 'суммаскидки': 'discount', 'discount': 'discount',
+  };
+
   let allRows = [];
   let revenueChart, funnelChart;
+  let marketingRows = [];
+  let marketingClientsChart, marketingPromoChart;
 
   const el = (id) => document.getElementById(id);
 
@@ -406,6 +500,7 @@
       document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
       btn.classList.add('active');
       el('tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'marketing') renderMarketing();
     });
   });
 
@@ -475,6 +570,48 @@
     return rows;
   }
 
+  function normalizeDate(value) {
+    const raw = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const match = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    if (!match) return raw;
+    return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  }
+
+  function parseMarketingCSV(text) {
+    const lines = text.split(/\r\n|\n|\r/).filter((line) => line.trim());
+    if (lines.length < 2) return [];
+    const delimiter = detectDelimiter(lines[0]);
+    const fields = parseCSVLine(lines[0], delimiter).map(
+      (header) => MARKETING_HEADER_ALIASES[normalizeHeader(header)] || null
+    );
+    if (!fields.includes('dateStr')) throw new Error('В CSV нет столбца «Дата»');
+
+    const numberFields = ['newClients','promoUses','promoCustomers','promoNewClients','orders','revenue','discount'];
+    const aggregated = new Map();
+    for (let index = 1; index < lines.length; index++) {
+      const cells = parseCSVLine(lines[index], delimiter);
+      const row = {};
+      fields.forEach((field, cellIndex) => {
+        if (field) row[field] = cells[cellIndex];
+      });
+      row.dateStr = normalizeDate(row.dateStr);
+      row.unit = row.unit || '';
+      row.promoCode = row.promoCode || '';
+      numberFields.forEach((field) => { row[field] = parseNumber(row[field]); });
+      if (!row.dateStr) continue;
+
+      const key = `${row.dateStr}|${row.unit}|${row.promoCode}`.toLowerCase();
+      if (!aggregated.has(key)) {
+        aggregated.set(key, row);
+      } else {
+        const current = aggregated.get(key);
+        numberFields.forEach((field) => { current[field] += row[field]; });
+      }
+    }
+    return [...aggregated.values()];
+  }
+
   // ---------- API ----------
   async function fetchRows() {
     const res = await fetch('/api/mindbox');
@@ -492,6 +629,22 @@
     return data.rows || [];
   }
 
+  async function fetchMarketingRows() {
+    const res = await fetch('/api/marketing');
+    const data = await res.json();
+    return data.rows || [];
+  }
+
+  async function pushMarketingRows(rows) {
+    const res = await fetch('/api/marketing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+    const data = await res.json();
+    return data.rows || [];
+  }
+
   // ---------- Rendering ----------
   function setStatus(msg) {
     el('statusMsg').textContent = msg;
@@ -501,6 +654,14 @@
   function fmtInt(n) { return Math.round(n).toLocaleString('ru-RU'); }
   function fmtMoney(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₾'; }
   function fmtPct(n) { return n.toFixed(1) + '%'; }
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
 
   function populateFilterOptions() {
     const platforms = [...new Set(allRows.map((r) => r.platform).filter(Boolean))].sort();
@@ -515,7 +676,7 @@
   function fillSelect(id, values) {
     const select = el(id);
     const current = select.value;
-    select.innerHTML = '<option value="">Все</option>' + values.map((v) => `<option value="${v}">${v}</option>`).join('');
+    select.innerHTML = '<option value="">Все</option>' + values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
     if (values.includes(current)) select.value = current;
   }
 
@@ -638,7 +799,7 @@
     el('top5Body').innerHTML = top5.map((a, i) => `
       <tr>
         <td><span class="rank ${i === 0 ? 'top' : ''}">${i + 1}</span></td>
-        <td><div class="msg-title">${a.name || ''}</div><div class="msg-sub">${a.campaign || ''}</div></td>
+        <td><div class="msg-title">${escapeHtml(a.name)}</div><div class="msg-sub">${escapeHtml(a.campaign)}</div></td>
         <td>${fmtInt(a.clicked)}</td>
         <td>${fmtInt(a.conversions)}</td>
         <td class="money ${i === 0 ? 'best' : ''}">${fmtMoney(a.revenue)}</td>
@@ -652,12 +813,12 @@
     const sorted = [...rows].sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
     tbody.innerHTML = sorted.map((r) => `
       <tr>
-        <td>${r.dateStr || ''}</td>
-        <td>${r.name || ''}</td>
-        <td>${r.subject || ''}</td>
-        <td>${r.platform || ''}</td>
-        <td>${r.type || ''}</td>
-        <td>${r.campaign || ''}</td>
+        <td>${escapeHtml(r.dateStr)}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${escapeHtml(r.subject)}</td>
+        <td>${escapeHtml(r.platform)}</td>
+        <td>${escapeHtml(r.type)}</td>
+        <td>${escapeHtml(r.campaign)}</td>
         <td>${fmtInt(r.sent)}</td>
         <td>${fmtInt(r.delivered)}</td>
         <td>${fmtPct(r.deliveryRate)}</td>
@@ -732,6 +893,180 @@
     });
   }
 
+  // ---------- Dodo marketing ----------
+  function setMarketingStatus(message) {
+    el('marketingStatus').textContent = message;
+    if (message) setTimeout(() => { el('marketingStatus').textContent = ''; }, 5000);
+  }
+
+  function populateMarketingFilters() {
+    const units = [...new Set(marketingRows.map((row) => row.unit).filter(Boolean))].sort();
+    const promoCodes = [...new Set(marketingRows.map((row) => row.promoCode).filter(Boolean))].sort();
+    fillSelect('marketingUnit', units);
+    fillSelect('marketingPromo', promoCodes);
+  }
+
+  function getFilteredMarketingRows() {
+    const unit = el('marketingUnit').value;
+    const promoCode = el('marketingPromo').value;
+    const dateFrom = el('marketingDateFrom').value;
+    const dateTo = el('marketingDateTo').value;
+
+    return marketingRows.filter((row) => {
+      if (unit && row.unit !== unit) return false;
+      if (promoCode && row.promoCode !== promoCode) return false;
+      if (dateFrom && row.dateStr && row.dateStr < dateFrom) return false;
+      if (dateTo && row.dateStr && row.dateStr > dateTo) return false;
+      return true;
+    });
+  }
+
+  function aggregateNewClients(rows) {
+    const byUnitDate = new Map();
+    rows.forEach((row) => {
+      const key = `${row.dateStr}|${row.unit}`;
+      byUnitDate.set(key, Math.max(byUnitDate.get(key) || 0, Number(row.newClients) || 0));
+    });
+    return [...byUnitDate.values()].reduce((sum, value) => sum + value, 0);
+  }
+
+  function renderMarketingKPIs(rows) {
+    const promoRows = rows.filter((row) => row.promoCode);
+    const newClients = aggregateNewClients(rows);
+    const promoUses = promoRows.reduce((sum, row) => sum + row.promoUses, 0);
+    const promoCustomers = promoRows.reduce((sum, row) => sum + row.promoCustomers, 0);
+    const promoNewClients = promoRows.reduce((sum, row) => sum + row.promoNewClients, 0);
+    const orders = promoRows.reduce((sum, row) => sum + row.orders, 0);
+    const revenue = promoRows.reduce((sum, row) => sum + row.revenue, 0);
+    const discount = promoRows.reduce((sum, row) => sum + row.discount, 0);
+
+    el('marketingNewClients').textContent = fmtInt(newClients);
+    el('marketingPromoUses').textContent = fmtInt(promoUses);
+    el('marketingPromoCustomers').textContent = fmtInt(promoCustomers);
+    el('marketingPromoNewClients').textContent = fmtInt(promoNewClients);
+    el('marketingNewShare').textContent = promoCustomers ? fmtPct((promoNewClients / promoCustomers) * 100) : '0%';
+    el('marketingRevenue').textContent = fmtMoney(revenue);
+    el('marketingDiscount').textContent = fmtMoney(discount);
+    el('marketingAvgOrder').textContent = orders ? fmtMoney(revenue / orders) : '0 ₾';
+  }
+
+  function renderMarketingCharts(rows) {
+    const clientsByUnitDate = new Map();
+    const promoByDate = {};
+    rows.forEach((row) => {
+      const unitDateKey = `${row.dateStr}|${row.unit}`;
+      clientsByUnitDate.set(
+        unitDateKey,
+        Math.max(clientsByUnitDate.get(unitDateKey) || 0, Number(row.newClients) || 0)
+      );
+      if (row.promoCode) promoByDate[row.dateStr] = (promoByDate[row.dateStr] || 0) + row.promoUses;
+    });
+
+    const clientsByDate = {};
+    clientsByUnitDate.forEach((value, key) => {
+      const date = key.split('|')[0];
+      clientsByDate[date] = (clientsByDate[date] || 0) + value;
+    });
+    const dates = [...new Set([...Object.keys(clientsByDate), ...Object.keys(promoByDate)])].sort();
+
+    if (marketingClientsChart) marketingClientsChart.destroy();
+    marketingClientsChart = new Chart(el('marketingClientsChart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          data: dates.map((date) => clientsByDate[date] || 0),
+          borderColor: '#35c37b',
+          backgroundColor: 'rgba(53,195,123,0.15)',
+          fill: true,
+          tension: 0.25,
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+          y: { beginAtZero: true, ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+        },
+      },
+    });
+
+    if (marketingPromoChart) marketingPromoChart.destroy();
+    marketingPromoChart = new Chart(el('marketingPromoChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: dates,
+        datasets: [{
+          data: dates.map((date) => promoByDate[date] || 0),
+          backgroundColor: '#ff6b35',
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9aa2b1' }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+        },
+      },
+    });
+  }
+
+  function renderPromoTable(rows) {
+    const byPromo = new Map();
+    rows.filter((row) => row.promoCode).forEach((row) => {
+      if (!byPromo.has(row.promoCode)) {
+        byPromo.set(row.promoCode, {
+          promoCode: row.promoCode,
+          promoUses: 0,
+          promoCustomers: 0,
+          promoNewClients: 0,
+          orders: 0,
+          revenue: 0,
+          discount: 0,
+        });
+      }
+      const aggregate = byPromo.get(row.promoCode);
+      ['promoUses','promoCustomers','promoNewClients','orders','revenue','discount'].forEach((field) => {
+        aggregate[field] += Number(row[field]) || 0;
+      });
+    });
+
+    const promoRows = [...byPromo.values()].sort((a, b) => b.revenue - a.revenue);
+    el('promoTableBody').innerHTML = promoRows.map((row) => {
+      const newShare = row.promoCustomers ? (row.promoNewClients / row.promoCustomers) * 100 : 0;
+      const avgOrder = row.orders ? row.revenue / row.orders : 0;
+      const revenueToDiscount = row.discount ? row.revenue / row.discount : 0;
+      return `
+        <tr>
+          <td><strong>${escapeHtml(row.promoCode)}</strong></td>
+          <td>${fmtInt(row.promoUses)}</td>
+          <td>${fmtInt(row.promoCustomers)}</td>
+          <td>${fmtInt(row.promoNewClients)}</td>
+          <td>${fmtPct(newShare)}</td>
+          <td>${fmtInt(row.orders)}</td>
+          <td>${fmtMoney(row.revenue)}</td>
+          <td>${fmtMoney(row.discount)}</td>
+          <td>${fmtMoney(avgOrder)}</td>
+          <td>${revenueToDiscount ? revenueToDiscount.toFixed(1) + '×' : '—'}</td>
+        </tr>
+      `;
+    }).join('');
+    el('marketingEmptyState').style.display = promoRows.length ? 'none' : 'block';
+    el('promoTable').style.display = promoRows.length ? '' : 'none';
+  }
+
+  function renderMarketing() {
+    populateMarketingFilters();
+    const rows = getFilteredMarketingRows();
+    renderMarketingKPIs(rows);
+    renderPromoTable(rows);
+    try {
+      renderMarketingCharts(rows);
+    } catch (error) {
+      console.error('Marketing chart rendering failed:', error);
+    }
+  }
+
   // ---------- Events ----------
   el('uploadBtn').addEventListener('click', () => el('csvInput').click());
 
@@ -751,7 +1086,38 @@
     e.target.value = '';
   });
 
+  el('marketingUploadBtn').addEventListener('click', () => el('marketingCsvInput').click());
+
+  el('marketingTemplateBtn').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = '/marketing-template.csv';
+    link.download = 'dodo-marketing-template.csv';
+    link.click();
+  });
+
+  el('marketingCsvInput').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const parsedRows = parseMarketingCSV(await file.text());
+      if (!parsedRows.length) {
+        setMarketingStatus('Файл пустой или не распознан');
+        return;
+      }
+      setMarketingStatus(`Загрузка ${parsedRows.length} строк...`);
+      marketingRows = await pushMarketingRows(parsedRows);
+      renderMarketing();
+      setMarketingStatus(`Готово: ${parsedRows.length} строк обработано`);
+    } catch (error) {
+      console.error(error);
+      setMarketingStatus(error.message || 'Не удалось обработать CSV');
+    } finally {
+      event.target.value = '';
+    }
+  });
+
   const DATE_FILTER_KEY = 'dodoDashboardDateFilters';
+  const MARKETING_DATE_FILTER_KEY = 'dodoDashboardMarketingDateFilters';
 
   function saveDateFilters() {
     try {
@@ -776,6 +1142,29 @@
     }
   }
 
+  function saveMarketingDateFilters() {
+    try {
+      localStorage.setItem(MARKETING_DATE_FILTER_KEY, JSON.stringify({
+        from: el('marketingDateFrom').value,
+        to: el('marketingDateTo').value,
+      }));
+    } catch (error) {
+      // localStorage unavailable — ignore
+    }
+  }
+
+  function loadMarketingDateFilters() {
+    try {
+      const raw = localStorage.getItem(MARKETING_DATE_FILTER_KEY);
+      if (!raw) return;
+      const { from, to } = JSON.parse(raw);
+      if (from) el('marketingDateFrom').value = from;
+      if (to) el('marketingDateTo').value = to;
+    } catch (error) {
+      // corrupt or unavailable — ignore
+    }
+  }
+
   ['filterPlatform','filterType','filterCampaign'].forEach((id) => {
     el(id).addEventListener('change', renderAll);
   });
@@ -787,16 +1176,30 @@
     });
   });
 
+  ['marketingUnit','marketingPromo'].forEach((id) => {
+    el(id).addEventListener('change', renderMarketing);
+  });
+
+  ['marketingDateFrom','marketingDateTo'].forEach((id) => {
+    el(id).addEventListener('change', () => {
+      saveMarketingDateFilters();
+      renderMarketing();
+    });
+  });
+
   // ---------- Init ----------
   (async function init() {
     loadDateFilters();
+    loadMarketingDateFilters();
     try {
-      allRows = await fetchRows();
+      [allRows, marketingRows] = await Promise.all([fetchRows(), fetchMarketingRows()]);
     } catch (err) {
       console.error(err);
       setStatus('Ошибка загрузки данных с сервера');
+      setMarketingStatus('Ошибка загрузки данных с сервера');
     }
     renderAll();
+    renderMarketing();
   })();
 })();
 </script>
