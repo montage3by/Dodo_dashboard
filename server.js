@@ -2,6 +2,7 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
@@ -62,13 +63,40 @@ function normalizeRow(row) {
   return normalized;
 }
 
+const AUTH_USER = process.env.DASHBOARD_USER || 'admin';
+const AUTH_PASSWORD = process.env.DASHBOARD_PASSWORD || 'dodo2026';
+
+function safeEqual(a, b) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const [scheme, encoded] = header.split(' ');
+
+  if (scheme === 'Basic' && encoded) {
+    const [user, password] = Buffer.from(encoded, 'base64').toString().split(':');
+    if (user && password && safeEqual(user, AUTH_USER) && safeEqual(password, AUTH_PASSWORD)) {
+      return next();
+    }
+  }
+
+  res.set('WWW-Authenticate', 'Basic realm="Dodo Dashboard"');
+  res.status(401).send('Authentication required');
+}
+
 const app = express();
 app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use(requireAuth);
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/mindbox', (req, res) => {
   const rows = selectAllStmt.all();
