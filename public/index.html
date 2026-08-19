@@ -207,8 +207,8 @@
       <div class="kpi"><div class="label">Клики</div><div class="value" id="kpiClicked">0</div></div>
       <div class="kpi"><div class="label">% кликов</div><div class="value" id="kpiClickRate">0%</div></div>
       <div class="kpi"><div class="label">Конверсии</div><div class="value" id="kpiConversions">0</div></div>
-      <div class="kpi"><div class="label">Доход</div><div class="value" id="kpiRevenue">0 ₽</div></div>
-      <div class="kpi"><div class="label">Средний чек</div><div class="value" id="kpiAvgOrder">0 ₽</div></div>
+      <div class="kpi"><div class="label">Доход</div><div class="value" id="kpiRevenue">0 ₾</div></div>
+      <div class="kpi"><div class="label">Средний чек</div><div class="value" id="kpiAvgOrder">0 ₾</div></div>
     </div>
 
     <div class="charts-grid">
@@ -394,7 +394,7 @@
   }
 
   function fmtInt(n) { return Math.round(n).toLocaleString('ru-RU'); }
-  function fmtMoney(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
+  function fmtMoney(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₾'; }
   function fmtPct(n) { return n.toFixed(1) + '%'; }
 
   function populateFilterOptions() {
@@ -453,7 +453,7 @@
     el('kpiClickRate').textContent = delivered ? fmtPct((clicked / delivered) * 100) : '0%';
     el('kpiConversions').textContent = fmtInt(conversions);
     el('kpiRevenue').textContent = fmtMoney(revenue);
-    el('kpiAvgOrder').textContent = conversions ? fmtMoney(revenue / conversions) : '0 ₽';
+    el('kpiAvgOrder').textContent = conversions ? fmtMoney(revenue / conversions) : '0 ₾';
   }
 
   function renderTable(rows) {
