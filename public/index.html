@@ -197,7 +197,6 @@
       </div>
       <div class="spacer"></div>
       <span id="statusMsg" class="status-msg"></span>
-      <button class="btn danger" id="resetBtn">Сбросить</button>
     </div>
 
     <div class="kpi-grid">
@@ -383,10 +382,6 @@
     return data.rows || [];
   }
 
-  async function resetRows() {
-    await fetch('/api/mindbox', { method: 'DELETE' });
-  }
-
   // ---------- Rendering ----------
   function setStatus(msg) {
     el('statusMsg').textContent = msg;
@@ -558,14 +553,6 @@
     renderAll();
     setStatus(`Готово: ${parsedRows.length} строк обработано`);
     e.target.value = '';
-  });
-
-  el('resetBtn').addEventListener('click', async () => {
-    if (!confirm('Удалить все загруженные данные Mindbox?')) return;
-    await resetRows();
-    allRows = [];
-    renderAll();
-    setStatus('Данные сброшены');
   });
 
   ['filterPlatform','filterType','filterCampaign','dateFrom','dateTo'].forEach((id) => {
