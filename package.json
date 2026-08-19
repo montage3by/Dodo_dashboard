@@ -4,7 +4,9 @@
   "description": "Dodo marketing dashboard (Mindbox / Google Ads / Meta) with Express + SQLite backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "upload:marketing": "node scripts/upload-marketing.js",
+    "test": "node --test"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
