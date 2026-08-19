@@ -17,6 +17,12 @@
     --accent-2: #4da3ff;
     --good: #35c37b;
     --bad: #ff5c5c;
+    --accent-soft: rgba(255, 107, 53, 0.12);
+    --accent-line: rgba(255, 107, 53, 0.35);
+    --good-soft: rgba(53, 195, 123, 0.12);
+    --good-line: rgba(53, 195, 123, 0.35);
+    --bad-soft: rgba(255, 92, 92, 0.12);
+    --bad-line: rgba(255, 92, 92, 0.35);
   }
   * { box-sizing: border-box; }
   body {
@@ -32,6 +38,8 @@
     align-items: center;
     justify-content: space-between;
   }
+  header .brand { display: flex; align-items: center; gap: 14px; }
+  header .brand img { height: 44px; width: auto; display: block; }
   header h1 { font-size: 20px; margin: 0; }
   header .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
   nav.tabs {
@@ -148,14 +156,61 @@
   }
   .placeholder h2 { color: var(--text); margin-top: 0; }
   .status-msg { font-size: 12px; color: var(--muted); margin-left: 8px; }
+
+  .insights-section { margin-bottom: 20px; }
+  .panel { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .panel.orange { background: linear-gradient(135deg, rgba(255,107,53,0.06), rgba(255,107,53,0.01)); border-color: var(--accent-line); }
+  .panel-heading { font-size: 14px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .panel.orange .panel-heading { color: var(--accent); }
+
+  .best-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .push-card {
+    background: var(--panel-2);
+    border: 1px solid var(--accent-line);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .push-card .pill {
+    position: absolute; right: 12px; top: 12px;
+    font-size: 10px; font-weight: 700;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 4px 9px;
+  }
+  .push-label { font-size: 12px; color: var(--muted); max-width: 75%; }
+  .push-title { font-size: 15px; font-weight: 700; margin-top: 6px; line-height: 1.3; }
+  .push-sub { font-size: 12px; color: var(--muted); }
+  .push-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .push-number { font-size: 22px; font-weight: 800; color: var(--accent); margin-top: 2px; }
+
+  .insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .insight-card { border-radius: 10px; padding: 14px 16px; }
+  .insight-card.neutral { background: var(--panel-2); border: 1px solid var(--border); }
+  .insight-card.good { background: var(--good-soft); border: 1px solid var(--good-line); }
+  .insight-kicker { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .insight-value { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .insight-card.good .insight-value { color: var(--good); }
+  .insight-text { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  .rank { width: 24px; height: 24px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: var(--panel-2); font-weight: 700; font-size: 12px; }
+  .rank.top { background: var(--accent); color: #fff; }
+  .msg-title { font-weight: 700; font-size: 13px; }
+  .msg-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .money.best { color: var(--accent); font-weight: 800; }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <h1>Dodo Marketing Dashboard</h1>
-    <div class="sub">Mindbox · Google Ads · Meta</div>
+  <div class="brand">
+    <img src="/dodo-logo.png" alt="Dodo Pizza" onerror="this.style.display='none'">
+    <div>
+      <h1>Dodo Marketing Dashboard</h1>
+      <div class="sub">Mindbox · Google Ads · Meta</div>
+    </div>
   </div>
 </header>
 
@@ -208,6 +263,61 @@
       <div class="kpi"><div class="label">Конверсии</div><div class="value" id="kpiConversions">0</div></div>
       <div class="kpi"><div class="label">Доход</div><div class="value" id="kpiRevenue">0 ₾</div></div>
       <div class="kpi"><div class="label">Средний чек</div><div class="value" id="kpiAvgOrder">0 ₾</div></div>
+    </div>
+
+    <div id="insightsSection" class="insights-section" style="display:none;">
+      <div class="panel orange">
+        <div class="panel-heading">🏆 Лучшее, что сработало</div>
+        <div class="best-grid">
+          <div class="push-card">
+            <div class="push-label">Самый кликабельный</div>
+            <span class="pill" id="bestClicksPill"></span>
+            <div class="push-title" id="bestClicksName">—</div>
+            <div class="push-sub" id="bestClicksSub"></div>
+            <div class="push-footer">Клики за период<div class="push-number" id="bestClicksStat">0</div></div>
+          </div>
+          <div class="push-card">
+            <div class="push-label">Принёс больше всего выручки</div>
+            <span class="pill" id="bestRevenuePill"></span>
+            <div class="push-title" id="bestRevenueName">—</div>
+            <div class="push-sub" id="bestRevenueSub"></div>
+            <div class="push-footer">Выручка за период<div class="push-number" id="bestRevenueStat">0 ₾</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading">📊 Наблюдения периода</div>
+        <div class="insight-grid">
+          <div class="insight-card neutral">
+            <div class="insight-kicker">Масштаб</div>
+            <div class="insight-value" id="insightScale">0</div>
+            <div class="insight-text" id="insightScaleText"></div>
+          </div>
+          <div class="insight-card neutral">
+            <div class="insight-kicker">CTR периода</div>
+            <div class="insight-value" id="insightCtr">0%</div>
+            <div class="insight-text" id="insightCtrText"></div>
+          </div>
+          <div class="insight-card good" id="insightBestConvCard" style="display:none;">
+            <div class="insight-kicker">Лучшая конверсия</div>
+            <div class="insight-value" id="insightBestConv">0%</div>
+            <div class="insight-text" id="insightBestConvText"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Топ-5 рассылок по выручке</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Рассылка</th><th>Клики</th><th>Конверсии</th><th>Выручка</th><th>Ср. чек</th></tr>
+            </thead>
+            <tbody id="top5Body"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div class="charts-grid">
@@ -431,7 +541,12 @@
     const rows = getFilteredRows();
     renderKPIs(rows);
     renderTable(rows);
-    renderCharts(rows);
+    renderInsights(rows);
+    try {
+      renderCharts(rows);
+    } catch (err) {
+      console.error('Chart rendering failed:', err);
+    }
   }
 
   function renderKPIs(rows) {
@@ -449,6 +564,87 @@
     el('kpiConversions').textContent = fmtInt(conversions);
     el('kpiRevenue').textContent = fmtMoney(revenue);
     el('kpiAvgOrder').textContent = conversions ? fmtMoney(revenue / conversions) : '0 ₾';
+  }
+
+  function aggregateByMessage(rows) {
+    const map = new Map();
+    rows.forEach((r) => {
+      const key = r.name || r.mailingId;
+      if (!map.has(key)) {
+        map.set(key, { name: r.name, campaign: r.campaign, sent: 0, delivered: 0, clicked: 0, conversions: 0, revenue: 0 });
+      }
+      const agg = map.get(key);
+      agg.sent += r.sent;
+      agg.delivered += r.delivered;
+      agg.clicked += r.clicked;
+      agg.conversions += r.conversions;
+      agg.revenue += r.revenue;
+    });
+    return Array.from(map.values()).map((a) => ({
+      ...a,
+      ctr: a.delivered ? (a.clicked / a.delivered) * 100 : 0,
+      convRate: a.delivered ? (a.conversions / a.delivered) * 100 : 0,
+      avgOrder: a.conversions ? a.revenue / a.conversions : 0,
+    }));
+  }
+
+  function renderInsights(rows) {
+    const section = el('insightsSection');
+    if (!rows.length) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+
+    const agg = aggregateByMessage(rows);
+    const byClicks = [...agg].sort((a, b) => b.clicked - a.clicked);
+    const byRevenue = [...agg].sort((a, b) => b.revenue - a.revenue);
+
+    const topClicks = byClicks[0];
+    el('bestClicksName').textContent = topClicks.name || '—';
+    el('bestClicksSub').textContent = topClicks.campaign || '';
+    el('bestClicksStat').textContent = fmtInt(topClicks.clicked);
+    el('bestClicksPill').textContent = `CTR ${fmtPct(topClicks.ctr)}`;
+
+    const topRevenue = byRevenue[0];
+    el('bestRevenueName').textContent = topRevenue.name || '—';
+    el('bestRevenueSub').textContent = topRevenue.campaign || '';
+    el('bestRevenueStat').textContent = fmtMoney(topRevenue.revenue);
+    el('bestRevenuePill').textContent = `${fmtInt(topRevenue.conversions)} конв.`;
+
+    const totalSent = rows.reduce((s, r) => s + r.sent, 0);
+    const totalDelivered = rows.reduce((s, r) => s + r.delivered, 0);
+    const totalClicked = rows.reduce((s, r) => s + r.clicked, 0);
+    const deliveryRate = totalSent ? (totalDelivered / totalSent) * 100 : 0;
+    const ctrOverall = totalDelivered ? (totalClicked / totalDelivered) * 100 : 0;
+
+    el('insightScale').textContent = `${fmtInt(totalSent)} отправок`;
+    el('insightScaleText').textContent = `${fmtInt(totalDelivered)} доставлено, доставляемость ${fmtPct(deliveryRate)}`;
+
+    el('insightCtr').textContent = fmtPct(ctrOverall);
+    el('insightCtrText').textContent = `${fmtInt(totalClicked)} кликов за период`;
+
+    const eligible = agg.filter((a) => a.delivered >= 20);
+    const bestConv = [...eligible].sort((a, b) => b.convRate - a.convRate)[0];
+    if (bestConv && bestConv.convRate > 0) {
+      el('insightBestConvCard').style.display = '';
+      el('insightBestConv').textContent = fmtPct(bestConv.convRate);
+      el('insightBestConvText').textContent = bestConv.name || '';
+    } else {
+      el('insightBestConvCard').style.display = 'none';
+    }
+
+    const top5 = byRevenue.slice(0, 5);
+    el('top5Body').innerHTML = top5.map((a, i) => `
+      <tr>
+        <td><span class="rank ${i === 0 ? 'top' : ''}">${i + 1}</span></td>
+        <td><div class="msg-title">${a.name || ''}</div><div class="msg-sub">${a.campaign || ''}</div></td>
+        <td>${fmtInt(a.clicked)}</td>
+        <td>${fmtInt(a.conversions)}</td>
+        <td class="money ${i === 0 ? 'best' : ''}">${fmtMoney(a.revenue)}</td>
+        <td class="money">${fmtMoney(a.avgOrder)}</td>
+      </tr>
+    `).join('');
   }
 
   function renderTable(rows) {
