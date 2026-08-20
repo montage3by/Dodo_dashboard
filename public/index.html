@@ -104,6 +104,7 @@
   }
   .btn.danger { background: var(--bad); }
   .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; filter: none; }
   input[type="file"] { display: none; }
 
   .kpi-grid {
@@ -362,6 +363,11 @@
         <input type="file" id="marketingCsvInput" accept=".csv">
       </div>
       <div>
+        <label for="marketingReplaceCsvInput">Полная замена</label>
+        <button class="btn danger" id="marketingReplaceBtn">Заменить данные</button>
+        <input type="file" id="marketingReplaceCsvInput" accept=".csv">
+      </div>
+      <div>
         <label>&nbsp;</label>
         <button class="btn secondary" id="marketingTemplateBtn">Скачать шаблон</button>
       </div>
@@ -386,6 +392,7 @@
     </div>
 
     <div class="format-hint">
+      «Загрузить CSV» добавляет или обновляет строки. «Заменить данные» удаляет прежний набор и загружает новый целиком.<br>
       Одна строка — один день, пиццерия и промокод. Поддерживаемые поля:
       <code>Дата, Пиццерия, Новые клиенты, Промокод, Срабатывания, Уникальные клиенты, Новые клиенты по промокоду, Заказы, Выручка, Скидка</code>.
     </div>
@@ -642,6 +649,18 @@
       body: JSON.stringify({ rows }),
     });
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Не удалось загрузить данные');
+    return data.rows || [];
+  }
+
+  async function replaceMarketingRows(rows) {
+    const res = await fetch('/api/marketing', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Не удалось заменить данные');
     return data.rows || [];
   }
 
@@ -1087,6 +1106,7 @@
   });
 
   el('marketingUploadBtn').addEventListener('click', () => el('marketingCsvInput').click());
+  el('marketingReplaceBtn').addEventListener('click', () => el('marketingReplaceCsvInput').click());
 
   el('marketingTemplateBtn').addEventListener('click', () => {
     const link = document.createElement('a');
@@ -1095,26 +1115,47 @@
     link.click();
   });
 
-  el('marketingCsvInput').addEventListener('change', async (event) => {
+  async function handleMarketingCsv(event, replaceExisting) {
     const file = event.target.files[0];
     if (!file) return;
+    const button = el(replaceExisting ? 'marketingReplaceBtn' : 'marketingUploadBtn');
     try {
       const parsedRows = parseMarketingCSV(await file.text());
       if (!parsedRows.length) {
         setMarketingStatus('Файл пустой или не распознан');
         return;
       }
-      setMarketingStatus(`Загрузка ${parsedRows.length} строк...`);
-      marketingRows = await pushMarketingRows(parsedRows);
+      if (replaceExisting) {
+        const confirmed = window.confirm(
+          `Все текущие маркетинговые данные будут удалены и заменены ${parsedRows.length} строками из файла «${file.name}». Продолжить?`
+        );
+        if (!confirmed) {
+          setMarketingStatus('Замена отменена');
+          return;
+        }
+      }
+      button.disabled = true;
+      setMarketingStatus(`${replaceExisting ? 'Замена' : 'Загрузка'} ${parsedRows.length} строк...`);
+      marketingRows = replaceExisting
+        ? await replaceMarketingRows(parsedRows)
+        : await pushMarketingRows(parsedRows);
       renderMarketing();
-      setMarketingStatus(`Готово: ${parsedRows.length} строк обработано`);
+      setMarketingStatus(
+        replaceExisting
+          ? `Готово: данные полностью заменены, загружено ${parsedRows.length} строк`
+          : `Готово: ${parsedRows.length} строк обработано`
+      );
     } catch (error) {
       console.error(error);
       setMarketingStatus(error.message || 'Не удалось обработать CSV');
     } finally {
+      button.disabled = false;
       event.target.value = '';
     }
-  });
+  }
+
+  el('marketingCsvInput').addEventListener('change', (event) => handleMarketingCsv(event, false));
+  el('marketingReplaceCsvInput').addEventListener('change', (event) => handleMarketingCsv(event, true));
 
   const DATE_FILTER_KEY = 'dodoDashboardDateFilters';
   const MARKETING_DATE_FILTER_KEY = 'dodoDashboardMarketingDateFilters';
