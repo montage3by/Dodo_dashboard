@@ -4,10 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const {
-  MARKETING_COLUMNS,
-  normalizeMarketingRow,
   parseMarketingCsv,
 } = require('./lib/marketing');
+const { createMarketingStore } = require('./lib/marketing-store');
 
 const dataDir = process.env.DASHBOARD_DATA_DIR || path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
@@ -69,17 +68,7 @@ const upsertStmt = db.prepare(`
 const selectAllStmt = db.prepare('SELECT * FROM mindbox_rows ORDER BY dateStr DESC');
 const deleteAllStmt = db.prepare('DELETE FROM mindbox_rows');
 
-const upsertMarketingStmt = db.prepare(`
-  INSERT INTO marketing_rows (${MARKETING_COLUMNS.join(', ')})
-  VALUES (${MARKETING_COLUMNS.map((c) => `@${c}`).join(', ')})
-  ON CONFLICT(rowId) DO UPDATE SET
-    ${MARKETING_COLUMNS.filter((c) => c !== 'rowId').map((c) => `${c} = excluded.${c}`).join(', ')}
-`);
-
-const selectAllMarketingStmt = db.prepare(
-  'SELECT * FROM marketing_rows ORDER BY dateStr DESC, unit, promoCode'
-);
-const deleteAllMarketingStmt = db.prepare('DELETE FROM marketing_rows');
+const marketingStore = createMarketingStore(db);
 
 function normalizeRow(row) {
   const normalized = {};
@@ -162,38 +151,40 @@ app.delete('/api/mindbox', (req, res) => {
 });
 
 app.get('/api/marketing', (req, res) => {
-  res.json({ rows: selectAllMarketingStmt.all() });
-});
-
-const insertMarketingRows = db.transaction((items) => {
-  for (const raw of items) {
-    if (!raw) continue;
-    const normalized = normalizeMarketingRow(raw);
-    if (!normalized.dateStr) continue;
-    upsertMarketingStmt.run(normalized);
-  }
+  res.json({ rows: marketingStore.allRows() });
 });
 
 app.post('/api/marketing', (req, res) => {
   const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+  const storedRows = marketingStore.insertRows(rows);
+  res.json({ ok: true, count: rows.length, rows: storedRows });
+});
 
-  insertMarketingRows(rows);
-
-  res.json({ ok: true, count: rows.length, rows: selectAllMarketingStmt.all() });
+app.put('/api/marketing', (req, res) => {
+  const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+  if (!rows.length) {
+    return res.status(400).json({ ok: false, error: 'Новый набор данных пуст' });
+  }
+  try {
+    const storedRows = marketingStore.replaceRows(rows);
+    return res.json({ ok: true, count: rows.length, rows: storedRows });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: error.message });
+  }
 });
 
 app.post('/api/marketing/import', (req, res) => {
   try {
     const rows = parseMarketingCsv(req.body);
-    insertMarketingRows(rows);
-    res.json({ ok: true, count: rows.length, rows: selectAllMarketingStmt.all() });
+    const storedRows = marketingStore.insertRows(rows);
+    res.json({ ok: true, count: rows.length, rows: storedRows });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
 });
 
 app.delete('/api/marketing', (req, res) => {
-  deleteAllMarketingStmt.run();
+  marketingStore.clearRows();
   res.json({ ok: true });
 });
 
