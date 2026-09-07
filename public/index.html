@@ -104,7 +104,6 @@
   }
   .btn.danger { background: var(--bad); }
   .btn:hover { filter: brightness(1.08); }
-  input[type="file"] { display: none; }
 
   .kpi-grid {
     display: grid;
@@ -226,11 +225,6 @@
   <section id="tab-mindbox" class="tab-panel active">
     <div class="toolbar">
       <div>
-        <label for="csvInput">Загрузить CSV</label>
-        <button class="btn" id="uploadBtn">Загрузить CSV</button>
-        <input type="file" id="csvInput" accept=".csv">
-      </div>
-      <div>
         <label for="filterPlatform">Платформа</label>
         <select id="filterPlatform"><option value="">Все</option></select>
       </div>
@@ -251,6 +245,7 @@
         <input type="date" id="dateTo">
       </div>
       <div class="spacer"></div>
+      <span id="dataAsOf" class="status-msg" style="display:none;"></span>
       <span id="statusMsg" class="status-msg"></span>
     </div>
 
@@ -346,15 +341,39 @@
           <tbody id="tableBody"></tbody>
         </table>
       </div>
-      <div id="emptyState" class="empty-state" style="display:none;">Нет данных. Загрузите CSV-файл с рассылками Mindbox.</div>
+      <div id="emptyState" class="empty-state" style="display:none;">Нет данных за выбранный период.</div>
     </div>
   </section>
 
   <!-- GOOGLE ADS TAB -->
   <section id="tab-google" class="tab-panel">
-    <div class="placeholder">
-      <h2>Google Ads</h2>
-      <p>Интеграция в разработке. Здесь появятся расходы, клики, конверсии и ROAS по кампаниям Google Ads.</p>
+    <div class="toolbar">
+      <div class="spacer"></div>
+      <span id="googleDataAsOf" class="status-msg" style="display:none;"></span>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Расход</div><div class="value" id="gaSpend">0 ₾</div></div>
+      <div class="kpi"><div class="label">Показы</div><div class="value" id="gaImpressions">0</div></div>
+      <div class="kpi"><div class="label">Клики</div><div class="value" id="gaClicks">0</div></div>
+      <div class="kpi"><div class="label">CTR</div><div class="value" id="gaCtr">0%</div></div>
+      <div class="kpi"><div class="label">Заказы</div><div class="value" id="gaOrders">0</div></div>
+      <div class="kpi"><div class="label">Выручка</div><div class="value" id="gaRevenue">0 ₾</div></div>
+      <div class="kpi"><div class="label">ROAS</div><div class="value" id="gaRoas">0</div></div>
+      <div class="kpi"><div class="label">Новые клиенты</div><div class="value" id="gaNewClients">0</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Кампании</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Месяц</th><th>Канал</th><th>Кампания</th><th>Adset</th><th>Расход</th><th>Показы</th><th>Клики</th><th>CTR</th><th>Заказы</th><th>Выручка</th><th>ROAS</th></tr>
+          </thead>
+          <tbody id="googleTableBody"></tbody>
+        </table>
+      </div>
+      <div id="googleEmptyState" class="empty-state" style="display:none;">Нет данных. Пришлите отчёт по Google Ads, чтобы загрузить.</div>
     </div>
   </section>
 
@@ -372,29 +391,8 @@
 (function () {
   'use strict';
 
-  const FIELDS = ['mailingId','name','subject','platform','type','campaign','dateStr',
-    'sent','delivered','deliveryRate','clicked','clickRate','conversions','conversionRate','revenue','avgOrder'];
-
-  const HEADER_ALIASES = {
-    'idрассылки': 'mailingId', 'id': 'mailingId', 'mailingid': 'mailingId',
-    'название': 'name', 'name': 'name',
-    'темаписьма': 'subject', 'тема': 'subject', 'subject': 'subject',
-    'платформа': 'platform', 'platform': 'platform',
-    'тип': 'type', 'type': 'type',
-    'кампания': 'campaign', 'campaign': 'campaign',
-    'дата': 'dateStr', 'date': 'dateStr',
-    'отправлено': 'sent', 'sent': 'sent',
-    'доставлено': 'delivered', 'delivered': 'delivered',
-    '%доставки': 'deliveryRate', 'доставка%': 'deliveryRate', 'deliveryrate': 'deliveryRate',
-    'клики': 'clicked', 'clicked': 'clicked', 'clicks': 'clicked',
-    '%кликов': 'clickRate', 'клики%': 'clickRate', 'clickrate': 'clickRate',
-    'конверсии': 'conversions', 'conversions': 'conversions',
-    '%конверсии': 'conversionRate', 'конверсия%': 'conversionRate', 'conversionrate': 'conversionRate',
-    'доход': 'revenue', 'revenue': 'revenue',
-    'среднийчек': 'avgOrder', 'avgorder': 'avgOrder', 'aov': 'avgOrder',
-  };
-
   let allRows = [];
+  let googleAdsRows = [];
   let revenueChart, funnelChart;
 
   const el = (id) => document.getElementById(id);
@@ -409,72 +407,6 @@
     });
   });
 
-  // ---------- CSV parsing ----------
-  function detectDelimiter(headerLine) {
-    const commas = (headerLine.match(/,/g) || []).length;
-    const semis = (headerLine.match(/;/g) || []).length;
-    return semis > commas ? ';' : ',';
-  }
-
-  function parseCSVLine(line, delim) {
-    const result = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (inQuotes) {
-        if (c === '"') {
-          if (line[i + 1] === '"') { cur += '"'; i++; }
-          else inQuotes = false;
-        } else cur += c;
-      } else {
-        if (c === '"') inQuotes = true;
-        else if (c === delim) { result.push(cur); cur = ''; }
-        else cur += c;
-      }
-    }
-    result.push(cur);
-    return result.map((s) => s.trim());
-  }
-
-  function normalizeHeader(h) {
-    return h.replace(/^﻿/, '').trim().toLowerCase().replace(/\s+/g, '').replace(/["']/g, '');
-  }
-
-  function parseNumber(v) {
-    if (v == null || v === '') return 0;
-    const cleaned = String(v).replace(/\s/g, '').replace('%', '').replace(',', '.');
-    const n = parseFloat(cleaned);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function parseCSV(text) {
-    const lines = text.split(/\r\n|\n|\r/).filter((l) => l.length > 0);
-    if (lines.length === 0) return [];
-    const delim = detectDelimiter(lines[0]);
-    const rawHeaders = parseCSVLine(lines[0], delim);
-    const fieldMap = rawHeaders.map((h) => HEADER_ALIASES[normalizeHeader(h)] || null);
-
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cells = parseCSVLine(lines[i], delim);
-      const row = {};
-      fieldMap.forEach((field, idx) => {
-        if (!field) return;
-        row[field] = cells[idx];
-      });
-      if (!row.mailingId) row.mailingId = `${row.campaign || ''}_${row.dateStr || ''}_${i}`;
-      for (const numField of ['sent','delivered','deliveryRate','clicked','clickRate','conversions','conversionRate','revenue','avgOrder']) {
-        row[numField] = parseNumber(row[numField]);
-      }
-      for (const strField of ['name','subject','platform','type','campaign','dateStr']) {
-        row[strField] = row[strField] || '';
-      }
-      rows.push(row);
-    }
-    return rows;
-  }
-
   // ---------- API ----------
   async function fetchRows() {
     const res = await fetch('/api/mindbox');
@@ -482,12 +414,8 @@
     return data.rows || [];
   }
 
-  async function pushRows(rows) {
-    const res = await fetch('/api/mindbox', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows }),
-    });
+  async function fetchGoogleAdsRows() {
+    const res = await fetch('/api/google-ads');
     const data = await res.json();
     return data.rows || [];
   }
@@ -536,8 +464,22 @@
     });
   }
 
+  function updateDataAsOf() {
+    const el2 = el('dataAsOf');
+    const dates = allRows.map((r) => r.dateStr).filter(Boolean);
+    if (!dates.length) {
+      el2.style.display = 'none';
+      return;
+    }
+    const maxDate = dates.reduce((a, b) => (b > a ? b : a));
+    const [y, m, d] = maxDate.split('-');
+    el2.textContent = `Данные собраны по ${d}.${m}.${y}`;
+    el2.style.display = '';
+  }
+
   function renderAll() {
     populateFilterOptions();
+    updateDataAsOf();
     const rows = getFilteredRows();
     renderKPIs(rows);
     renderTable(rows);
@@ -732,25 +674,65 @@
     });
   }
 
-  // ---------- Events ----------
-  el('uploadBtn').addEventListener('click', () => el('csvInput').click());
+  function formatMonthLabel(monthStr) {
+    if (!monthStr) return '';
+    const names = ['', 'января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    const [y, m] = monthStr.split('-');
+    const idx = parseInt(m, 10);
+    return `${names[idx] || m} ${y}`;
+  }
 
-  el('csvInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const text = await file.text();
-    const parsedRows = parseCSV(text);
-    if (parsedRows.length === 0) {
-      setStatus('Файл пустой или не распознан');
-      return;
+  function renderGoogleAds() {
+    const rows = googleAdsRows;
+
+    const spend = rows.reduce((s, r) => s + r.spendGel, 0);
+    const impressions = rows.reduce((s, r) => s + r.impressions, 0);
+    const clicks = rows.reduce((s, r) => s + r.clicks, 0);
+    const orders = rows.reduce((s, r) => s + r.orders, 0);
+    const revenue = rows.reduce((s, r) => s + r.revenueGel, 0);
+    const newClients = rows.reduce((s, r) => s + r.newClients, 0);
+    const ctr = impressions ? (clicks / impressions) * 100 : 0;
+    const roas = spend ? revenue / spend : 0;
+
+    el('gaSpend').textContent = fmtMoney(spend);
+    el('gaImpressions').textContent = fmtInt(impressions);
+    el('gaClicks').textContent = fmtInt(clicks);
+    el('gaCtr').textContent = fmtPct(ctr);
+    el('gaOrders').textContent = fmtInt(orders);
+    el('gaRevenue').textContent = fmtMoney(revenue);
+    el('gaRoas').textContent = roas.toFixed(2);
+    el('gaNewClients').textContent = fmtInt(newClients);
+
+    const sorted = [...rows].sort((a, b) => (b.month || '').localeCompare(a.month || '') || b.revenueGel - a.revenueGel);
+    el('googleTableBody').innerHTML = sorted.map((r) => `
+      <tr>
+        <td>${formatMonthLabel(r.month)}</td>
+        <td>${r.channel || ''}</td>
+        <td>${r.campaign || ''}</td>
+        <td>${r.adset || ''}</td>
+        <td>${fmtMoney(r.spendGel)}</td>
+        <td>${fmtInt(r.impressions)}</td>
+        <td>${fmtInt(r.clicks)}</td>
+        <td>${fmtPct(r.ctr)}</td>
+        <td>${fmtInt(r.orders)}</td>
+        <td>${fmtMoney(r.revenueGel)}</td>
+        <td>${r.roas.toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    el('googleEmptyState').style.display = rows.length ? 'none' : 'block';
+
+    const asOfEl = el('googleDataAsOf');
+    if (!rows.length) {
+      asOfEl.style.display = 'none';
+    } else {
+      const months = [...new Set(rows.map((r) => r.month).filter(Boolean))].sort();
+      asOfEl.textContent = `Данные собраны по ${formatMonthLabel(months[months.length - 1])}`;
+      asOfEl.style.display = '';
     }
-    setStatus(`Загрузка ${parsedRows.length} строк...`);
-    allRows = await pushRows(parsedRows);
-    renderAll();
-    setStatus(`Готово: ${parsedRows.length} строк обработано`);
-    e.target.value = '';
-  });
+  }
 
+  // ---------- Events ----------
   const DATE_FILTER_KEY = 'dodoDashboardDateFilters';
 
   function saveDateFilters() {
@@ -797,6 +779,13 @@
       setStatus('Ошибка загрузки данных с сервера');
     }
     renderAll();
+
+    try {
+      googleAdsRows = await fetchGoogleAdsRows();
+    } catch (err) {
+      console.error(err);
+    }
+    renderGoogleAds();
   })();
 })();
 </script>

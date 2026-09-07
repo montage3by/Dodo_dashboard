@@ -63,6 +63,55 @@ function normalizeRow(row) {
   return normalized;
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS google_ads_rows (
+    id TEXT PRIMARY KEY,
+    month TEXT,
+    channel TEXT,
+    campaign TEXT,
+    adset TEXT,
+    spend REAL,
+    spendGel REAL,
+    impressions REAL,
+    clicks REAL,
+    ctr REAL,
+    orders REAL,
+    revenueGel REAL,
+    roas REAL,
+    newClients REAL,
+    cac REAL
+  )
+`);
+
+const GOOGLE_ADS_COLUMNS = [
+  'id', 'month', 'channel', 'campaign', 'adset',
+  'spend', 'spendGel', 'impressions', 'clicks', 'ctr',
+  'orders', 'revenueGel', 'roas', 'newClients', 'cac',
+];
+
+const googleAdsUpsertStmt = db.prepare(`
+  INSERT INTO google_ads_rows (${GOOGLE_ADS_COLUMNS.join(', ')})
+  VALUES (${GOOGLE_ADS_COLUMNS.map((c) => `@${c}`).join(', ')})
+  ON CONFLICT(id) DO UPDATE SET
+    ${GOOGLE_ADS_COLUMNS.filter((c) => c !== 'id').map((c) => `${c} = excluded.${c}`).join(', ')}
+`);
+
+const googleAdsSelectAllStmt = db.prepare('SELECT * FROM google_ads_rows ORDER BY month DESC');
+const googleAdsDeleteAllStmt = db.prepare('DELETE FROM google_ads_rows');
+
+function normalizeGoogleAdsRow(row) {
+  const normalized = {};
+  for (const col of GOOGLE_ADS_COLUMNS) {
+    if (col === 'id' || col === 'month' || col === 'channel' || col === 'campaign' || col === 'adset') {
+      normalized[col] = row[col] != null ? String(row[col]) : '';
+    } else {
+      const num = Number(row[col]);
+      normalized[col] = Number.isFinite(num) ? num : 0;
+    }
+  }
+  return normalized;
+}
+
 const AUTH_USER = process.env.DASHBOARD_USER || 'admin';
 const AUTH_PASSWORD = process.env.DASHBOARD_PASSWORD || 'dodo2026';
 
@@ -120,6 +169,31 @@ app.post('/api/mindbox', (req, res) => {
 
 app.delete('/api/mindbox', (req, res) => {
   deleteAllStmt.run();
+  res.json({ ok: true });
+});
+
+app.get('/api/google-ads', (req, res) => {
+  const rows = googleAdsSelectAllStmt.all();
+  res.json({ rows });
+});
+
+app.post('/api/google-ads', (req, res) => {
+  const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+
+  const insertMany = db.transaction((items) => {
+    for (const raw of items) {
+      if (!raw || !raw.id) continue;
+      googleAdsUpsertStmt.run(normalizeGoogleAdsRow(raw));
+    }
+  });
+
+  insertMany(rows);
+
+  res.json({ ok: true, count: rows.length, rows: googleAdsSelectAllStmt.all() });
+});
+
+app.delete('/api/google-ads', (req, res) => {
+  googleAdsDeleteAllStmt.run();
   res.json({ ok: true });
 });
 
