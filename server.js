@@ -99,14 +99,20 @@ db.exec(`
     revenueGel REAL,
     roas REAL,
     newClients REAL,
-    cac REAL
+    cac REAL,
+    cpa REAL
   )
 `);
+
+const googleAdsTableInfo = db.prepare("PRAGMA table_info(google_ads_rows)").all();
+if (!googleAdsTableInfo.some((col) => col.name === 'cpa')) {
+  db.exec('ALTER TABLE google_ads_rows ADD COLUMN cpa REAL');
+}
 
 const GOOGLE_ADS_COLUMNS = [
   'id', 'month', 'channel', 'campaign', 'adset',
   'spend', 'spendGel', 'impressions', 'clicks', 'ctr',
-  'orders', 'revenueGel', 'roas', 'newClients', 'cac',
+  'orders', 'revenueGel', 'roas', 'newClients', 'cac', 'cpa',
 ];
 
 const googleAdsUpsertStmt = db.prepare(`

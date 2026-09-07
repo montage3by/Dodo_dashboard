@@ -448,6 +448,7 @@
       <div class="kpi"><div class="label">Выручка</div><div class="value" id="gaRevenue">0 ₾</div></div>
       <div class="kpi"><div class="label">ROAS</div><div class="value" id="gaRoas">0</div></div>
       <div class="kpi"><div class="label">Новые клиенты</div><div class="value" id="gaNewClients">0</div></div>
+      <div class="kpi"><div class="label">CPA</div><div class="value" id="gaCpa">0 ₾</div></div>
     </div>
 
     <div class="card">
@@ -455,7 +456,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Месяц</th><th>Канал</th><th>Кампания</th><th>Adset</th><th>Расход</th><th>Показы</th><th>Клики</th><th>CTR</th><th>Заказы</th><th>Выручка</th><th>ROAS</th></tr>
+            <tr><th>Месяц</th><th>Канал</th><th>Кампания</th><th>Adset</th><th>Расход</th><th>Показы</th><th>Клики</th><th>CTR</th><th>Заказы</th><th>Выручка</th><th>ROAS</th><th>CPA</th></tr>
           </thead>
           <tbody id="googleTableBody"></tbody>
         </table>
@@ -896,9 +897,9 @@
   function formatMonthLabel(monthStr) {
     if (!monthStr) return '';
     const names = ['', 'января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-    const [y, m] = monthStr.split('-');
-    const idx = parseInt(m, 10);
-    return `${names[idx] || m} ${y}`;
+    const [y, m] = monthStr.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    return `1–${lastDay} ${names[m] || m} ${y}`;
   }
 
   // ---------- Dodo marketing ----------
@@ -1086,6 +1087,7 @@
     const newClients = rows.reduce((s, r) => s + r.newClients, 0);
     const ctr = impressions ? (clicks / impressions) * 100 : 0;
     const roas = spend ? revenue / spend : 0;
+    const cpa = orders ? spend / orders : 0;
 
     el('gaSpend').textContent = fmtMoney(spend);
     el('gaImpressions').textContent = fmtInt(impressions);
@@ -1095,6 +1097,7 @@
     el('gaRevenue').textContent = fmtMoney(revenue);
     el('gaRoas').textContent = roas.toFixed(2);
     el('gaNewClients').textContent = fmtInt(newClients);
+    el('gaCpa').textContent = fmtMoney(cpa);
 
     const sorted = [...rows].sort((a, b) => (b.month || '').localeCompare(a.month || '') || b.revenueGel - a.revenueGel);
     el('googleTableBody').innerHTML = sorted.map((r) => `
@@ -1110,6 +1113,7 @@
         <td>${fmtInt(r.orders)}</td>
         <td>${fmtMoney(r.revenueGel)}</td>
         <td>${r.roas.toFixed(2)}</td>
+        <td>${fmtMoney(r.cpa)}</td>
       </tr>
     `).join('');
 
