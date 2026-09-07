@@ -3,8 +3,12 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const {
+  parseMarketingCsv,
+} = require('./lib/marketing');
+const { createMarketingStore } = require('./lib/marketing-store');
 
-const dataDir = path.join(__dirname, 'data');
+const dataDir = process.env.DASHBOARD_DATA_DIR || path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -31,7 +35,21 @@ db.exec(`
     conversionRate REAL,
     revenue REAL,
     avgOrder REAL
-  )
+  );
+
+  CREATE TABLE IF NOT EXISTS marketing_rows (
+    rowId TEXT PRIMARY KEY,
+    dateStr TEXT,
+    unit TEXT,
+    newClients REAL,
+    promoCode TEXT,
+    promoUses REAL,
+    promoCustomers REAL,
+    promoNewClients REAL,
+    orders REAL,
+    revenue REAL,
+    discount REAL
+  );
 `);
 
 const COLUMNS = [
@@ -49,6 +67,8 @@ const upsertStmt = db.prepare(`
 
 const selectAllStmt = db.prepare('SELECT * FROM mindbox_rows ORDER BY dateStr DESC');
 const deleteAllStmt = db.prepare('DELETE FROM mindbox_rows');
+
+const marketingStore = createMarketingStore(db);
 
 function normalizeRow(row) {
   const normalized = {};
@@ -114,6 +134,7 @@ function normalizeGoogleAdsRow(row) {
 
 const AUTH_USER = process.env.DASHBOARD_USER || 'admin';
 const AUTH_PASSWORD = process.env.DASHBOARD_PASSWORD || 'dodo2026';
+const INGEST_TOKEN = process.env.DASHBOARD_INGEST_TOKEN || '';
 
 function safeEqual(a, b) {
   const bufA = Buffer.from(a);
@@ -125,6 +146,11 @@ function safeEqual(a, b) {
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const [scheme, encoded] = header.split(' ');
+
+  const isImportRequest = req.method === 'POST' && req.path === '/api/marketing/import';
+  if (isImportRequest && scheme === 'Bearer' && INGEST_TOKEN && encoded && safeEqual(encoded, INGEST_TOKEN)) {
+    return next();
+  }
 
   if (scheme === 'Basic' && encoded) {
     const [user, password] = Buffer.from(encoded, 'base64').toString().split(':');
@@ -139,6 +165,7 @@ function requireAuth(req, res, next) {
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
+app.use(express.text({ type: ['text/csv', 'text/plain'], limit: '20mb' }));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -194,6 +221,44 @@ app.post('/api/google-ads', (req, res) => {
 
 app.delete('/api/google-ads', (req, res) => {
   googleAdsDeleteAllStmt.run();
+  res.json({ ok: true });
+});
+
+app.get('/api/marketing', (req, res) => {
+  res.json({ rows: marketingStore.allRows() });
+});
+
+app.post('/api/marketing', (req, res) => {
+  const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+  const storedRows = marketingStore.insertRows(rows);
+  res.json({ ok: true, count: rows.length, rows: storedRows });
+});
+
+app.put('/api/marketing', (req, res) => {
+  const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+  if (!rows.length) {
+    return res.status(400).json({ ok: false, error: 'Новый набор данных пуст' });
+  }
+  try {
+    const storedRows = marketingStore.replaceRows(rows);
+    return res.json({ ok: true, count: rows.length, rows: storedRows });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/api/marketing/import', (req, res) => {
+  try {
+    const rows = parseMarketingCsv(req.body);
+    const storedRows = marketingStore.insertRows(rows);
+    res.json({ ok: true, count: rows.length, rows: storedRows });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete('/api/marketing', (req, res) => {
+  marketingStore.clearRows();
   res.json({ ok: true });
 });
 
