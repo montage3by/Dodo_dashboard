@@ -435,6 +435,14 @@
   <!-- GOOGLE ADS TAB -->
   <section id="tab-google" class="tab-panel">
     <div class="toolbar">
+      <div>
+        <label for="gaDateFrom">С</label>
+        <input type="date" id="gaDateFrom">
+      </div>
+      <div>
+        <label for="gaDateTo">По</label>
+        <input type="date" id="gaDateTo">
+      </div>
       <div class="spacer"></div>
       <span id="googleDataAsOf" class="status-msg" style="display:none;"></span>
     </div>
@@ -1076,8 +1084,25 @@
     }
   }
 
+  function monthOverlapsRange(monthStr, dateFrom, dateTo) {
+    if (!dateFrom && !dateTo) return true;
+    const [y, m] = monthStr.split('-').map(Number);
+    const monthStart = monthStr;
+    const lastDay = new Date(y, m, 0).getDate();
+    const monthEnd = `${monthStr.slice(0, 8)}${String(lastDay).padStart(2, '0')}`;
+    if (dateFrom && monthEnd < dateFrom) return false;
+    if (dateTo && monthStart > dateTo) return false;
+    return true;
+  }
+
+  function getFilteredGoogleAdsRows() {
+    const dateFrom = el('gaDateFrom').value;
+    const dateTo = el('gaDateTo').value;
+    return googleAdsRows.filter((r) => monthOverlapsRange(r.month, dateFrom, dateTo));
+  }
+
   function renderGoogleAds() {
-    const rows = googleAdsRows;
+    const rows = getFilteredGoogleAdsRows();
 
     const spend = rows.reduce((s, r) => s + r.spendGel, 0);
     const impressions = rows.reduce((s, r) => s + r.impressions, 0);
@@ -1120,10 +1145,10 @@
     el('googleEmptyState').style.display = rows.length ? 'none' : 'block';
 
     const asOfEl = el('googleDataAsOf');
-    if (!rows.length) {
+    if (!googleAdsRows.length) {
       asOfEl.style.display = 'none';
     } else {
-      const months = [...new Set(rows.map((r) => r.month).filter(Boolean))].sort();
+      const months = [...new Set(googleAdsRows.map((r) => r.month).filter(Boolean))].sort();
       asOfEl.textContent = `Данные собраны по ${formatMonthLabel(months[months.length - 1])}`;
       asOfEl.style.display = '';
     }
@@ -1184,6 +1209,7 @@
 
   const DATE_FILTER_KEY = 'dodoDashboardDateFilters';
   const MARKETING_DATE_FILTER_KEY = 'dodoDashboardMarketingDateFilters';
+  const GOOGLE_ADS_DATE_FILTER_KEY = 'dodoDashboardGoogleAdsDateFilters';
 
   function saveDateFilters() {
     try {
@@ -1231,6 +1257,29 @@
     }
   }
 
+  function saveGoogleAdsDateFilters() {
+    try {
+      localStorage.setItem(GOOGLE_ADS_DATE_FILTER_KEY, JSON.stringify({
+        from: el('gaDateFrom').value,
+        to: el('gaDateTo').value,
+      }));
+    } catch (error) {
+      // localStorage unavailable — ignore
+    }
+  }
+
+  function loadGoogleAdsDateFilters() {
+    try {
+      const raw = localStorage.getItem(GOOGLE_ADS_DATE_FILTER_KEY);
+      if (!raw) return;
+      const { from, to } = JSON.parse(raw);
+      if (from) el('gaDateFrom').value = from;
+      if (to) el('gaDateTo').value = to;
+    } catch (error) {
+      // corrupt or unavailable — ignore
+    }
+  }
+
   ['filterPlatform','filterType','filterCampaign'].forEach((id) => {
     el(id).addEventListener('change', renderAll);
   });
@@ -1253,10 +1302,18 @@
     });
   });
 
+  ['gaDateFrom','gaDateTo'].forEach((id) => {
+    el(id).addEventListener('change', () => {
+      saveGoogleAdsDateFilters();
+      renderGoogleAds();
+    });
+  });
+
   // ---------- Init ----------
   (async function init() {
     loadDateFilters();
     loadMarketingDateFilters();
+    loadGoogleAdsDateFilters();
     try {
       [allRows, marketingRows] = await Promise.all([fetchRows(), fetchMarketingRows()]);
     } catch (err) {
