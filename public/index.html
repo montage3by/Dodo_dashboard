@@ -1211,6 +1211,23 @@
   const MARKETING_DATE_FILTER_KEY = 'dodoDashboardMarketingDateFilters';
   const GOOGLE_ADS_DATE_FILTER_KEY = 'dodoDashboardGoogleAdsDateFilters';
 
+  function currentMonthToDateRange() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const y = now.getFullYear();
+    const m = pad(now.getMonth() + 1);
+    return {
+      from: `${y}-${m}-01`,
+      to: `${y}-${m}-${pad(now.getDate())}`,
+    };
+  }
+
+  function applyDefaultRange(fromId, toId) {
+    const defaults = currentMonthToDateRange();
+    el(fromId).value = defaults.from;
+    el(toId).value = defaults.to;
+  }
+
   function saveDateFilters() {
     try {
       localStorage.setItem(DATE_FILTER_KEY, JSON.stringify({
@@ -1225,13 +1242,16 @@
   function loadDateFilters() {
     try {
       const raw = localStorage.getItem(DATE_FILTER_KEY);
-      if (!raw) return;
-      const { from, to } = JSON.parse(raw);
-      if (from) el('dateFrom').value = from;
-      if (to) el('dateTo').value = to;
+      if (raw) {
+        const { from, to } = JSON.parse(raw);
+        if (from) el('dateFrom').value = from;
+        if (to) el('dateTo').value = to;
+        return;
+      }
     } catch (err) {
-      // corrupt or unavailable — ignore
+      // corrupt or unavailable — fall through to default
     }
+    applyDefaultRange('dateFrom', 'dateTo');
   }
 
   function saveMarketingDateFilters() {
@@ -1248,13 +1268,16 @@
   function loadMarketingDateFilters() {
     try {
       const raw = localStorage.getItem(MARKETING_DATE_FILTER_KEY);
-      if (!raw) return;
-      const { from, to } = JSON.parse(raw);
-      if (from) el('marketingDateFrom').value = from;
-      if (to) el('marketingDateTo').value = to;
+      if (raw) {
+        const { from, to } = JSON.parse(raw);
+        if (from) el('marketingDateFrom').value = from;
+        if (to) el('marketingDateTo').value = to;
+        return;
+      }
     } catch (error) {
-      // corrupt or unavailable — ignore
+      // corrupt or unavailable — fall through to default
     }
+    applyDefaultRange('marketingDateFrom', 'marketingDateTo');
   }
 
   function saveGoogleAdsDateFilters() {
@@ -1271,13 +1294,16 @@
   function loadGoogleAdsDateFilters() {
     try {
       const raw = localStorage.getItem(GOOGLE_ADS_DATE_FILTER_KEY);
-      if (!raw) return;
-      const { from, to } = JSON.parse(raw);
-      if (from) el('gaDateFrom').value = from;
-      if (to) el('gaDateTo').value = to;
+      if (raw) {
+        const { from, to } = JSON.parse(raw);
+        if (from) el('gaDateFrom').value = from;
+        if (to) el('gaDateTo').value = to;
+        return;
+      }
     } catch (error) {
-      // corrupt or unavailable — ignore
+      // corrupt or unavailable — fall through to default
     }
+    applyDefaultRange('gaDateFrom', 'gaDateTo');
   }
 
   ['filterPlatform','filterType','filterCampaign'].forEach((id) => {
