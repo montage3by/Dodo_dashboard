@@ -436,16 +436,17 @@
   <section id="tab-google" class="tab-panel">
     <div class="toolbar">
       <div>
-        <label for="gaDateFrom">С</label>
-        <input type="date" id="gaDateFrom">
+        <label for="gaMonthFrom">Месяц с</label>
+        <select id="gaMonthFrom"></select>
       </div>
       <div>
-        <label for="gaDateTo">По</label>
-        <input type="date" id="gaDateTo">
+        <label for="gaMonthTo">Месяц по</label>
+        <select id="gaMonthTo"></select>
       </div>
       <div class="spacer"></div>
       <span id="googleDataAsOf" class="status-msg" style="display:none;"></span>
     </div>
+    <p class="format-hint">Данные Google Ads выгружаются помесячно (без разбивки по дням), поэтому фильтр — по месяцам.</p>
 
     <div class="kpi-grid">
       <div class="kpi"><div class="label">Расход</div><div class="value" id="gaSpend">0 ₾</div></div>
@@ -910,6 +911,13 @@
     return `1–${lastDay} ${names[m] || m} ${y}`;
   }
 
+  function monthLabelShort(monthStr) {
+    if (!monthStr) return '';
+    const names = ['', 'Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    const [y, m] = monthStr.split('-').map(Number);
+    return `${names[m] || m} ${y}`;
+  }
+
   // ---------- Dodo marketing ----------
   function setMarketingStatus(message) {
     el('marketingStatus').textContent = message;
@@ -1084,21 +1092,15 @@
     }
   }
 
-  function monthOverlapsRange(monthStr, dateFrom, dateTo) {
-    if (!dateFrom && !dateTo) return true;
-    const [y, m] = monthStr.split('-').map(Number);
-    const monthStart = monthStr;
-    const lastDay = new Date(y, m, 0).getDate();
-    const monthEnd = `${monthStr.slice(0, 8)}${String(lastDay).padStart(2, '0')}`;
-    if (dateFrom && monthEnd < dateFrom) return false;
-    if (dateTo && monthStart > dateTo) return false;
-    return true;
-  }
-
   function getFilteredGoogleAdsRows() {
-    const dateFrom = el('gaDateFrom').value;
-    const dateTo = el('gaDateTo').value;
-    return googleAdsRows.filter((r) => monthOverlapsRange(r.month, dateFrom, dateTo));
+    const monthFrom = el('gaMonthFrom').value;
+    const monthTo = el('gaMonthTo').value;
+    return googleAdsRows.filter((r) => {
+      if (!r.month) return false;
+      if (monthFrom && r.month < monthFrom) return false;
+      if (monthTo && r.month > monthTo) return false;
+      return true;
+    });
   }
 
   function renderGoogleAds() {
@@ -1283,27 +1285,41 @@
   function saveGoogleAdsDateFilters() {
     try {
       localStorage.setItem(GOOGLE_ADS_DATE_FILTER_KEY, JSON.stringify({
-        from: el('gaDateFrom').value,
-        to: el('gaDateTo').value,
+        from: el('gaMonthFrom').value,
+        to: el('gaMonthTo').value,
       }));
     } catch (error) {
       // localStorage unavailable — ignore
     }
   }
 
+  function populateGoogleAdsMonthFilters() {
+    const months = [...new Set(googleAdsRows.map((r) => r.month).filter(Boolean))].sort();
+    const options = months.map((m) => `<option value="${m}">${monthLabelShort(m)}</option>`).join('');
+    el('gaMonthFrom').innerHTML = options;
+    el('gaMonthTo').innerHTML = options;
+    return months;
+  }
+
   function loadGoogleAdsDateFilters() {
+    const months = populateGoogleAdsMonthFilters();
+    if (!months.length) return;
+
+    let from, to;
     try {
       const raw = localStorage.getItem(GOOGLE_ADS_DATE_FILTER_KEY);
       if (raw) {
-        const { from, to } = JSON.parse(raw);
-        if (from) el('gaDateFrom').value = from;
-        if (to) el('gaDateTo').value = to;
-        return;
+        ({ from, to } = JSON.parse(raw));
       }
     } catch (error) {
       // corrupt or unavailable — fall through to default
     }
-    applyDefaultRange('gaDateFrom', 'gaDateTo');
+
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+    const defaultMonth = months.includes(currentMonth) ? currentMonth : months[months.length - 1];
+
+    el('gaMonthFrom').value = months.includes(from) ? from : defaultMonth;
+    el('gaMonthTo').value = months.includes(to) ? to : defaultMonth;
   }
 
   ['filterPlatform','filterType','filterCampaign'].forEach((id) => {
@@ -1328,7 +1344,7 @@
     });
   });
 
-  ['gaDateFrom','gaDateTo'].forEach((id) => {
+  ['gaMonthFrom','gaMonthTo'].forEach((id) => {
     el(id).addEventListener('change', () => {
       saveGoogleAdsDateFilters();
       renderGoogleAds();
@@ -1339,7 +1355,6 @@
   (async function init() {
     loadDateFilters();
     loadMarketingDateFilters();
-    loadGoogleAdsDateFilters();
     try {
       [allRows, marketingRows] = await Promise.all([fetchRows(), fetchMarketingRows()]);
     } catch (err) {
@@ -1354,6 +1369,7 @@
     } catch (err) {
       console.error(err);
     }
+    loadGoogleAdsDateFilters();
     renderGoogleAds();
 
     renderMarketing();
